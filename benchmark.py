@@ -43,7 +43,8 @@ def preflight(rank):
         print(f"[rank {rank}] device_count={torch.cuda.device_count()}")
 
 
-def main():
+#def main():
+def main(chunk_size, batch, seq, hidden_dim, num_experts, topk):
     rank, world_size, local_rank = infer_rank_info()
     preflight(rank)
 
@@ -189,15 +190,17 @@ if __name__ == "__main__":
 #    main()
     # 4 config sweep
     parser = argparse.ArgumentParser()
-   
-    parser.add_argument('--chunk_size', type=int, default=32, help='Chunk size')
-    parser.add_argument('--batch', type=int, default=4, help='Batch size')
-    parser.add_argument('--seq_len', type=int, default=4096, help='Sequence length')
     
+    parser.add_argument('--batch', type=int, default=1, help='Batch size')
+    parser.add_argument('--seq_len', type=int, default=512, help='Sequence length')
+    parser.add_argument('--num_experts', type=int, default=16, help='Number of Experts')
+    parser.add_argument('--topk', type=int, default=2, help='Top K experts')
+    parser.add_argument('--hidden_dim', type=int, default=768, help='Hidden dimension')
+    
+    parser.add_argument('--chunk_size', type=int, default=32, help='Chunk size')
+
     args = parser.parse_args()
 
+    print(f">> Config: B={args.batch}, S={args.seq_len}, E={args.num_experts}, K={args.topk}, H={args.hidden_dim}")
 
-    print(f">> Running with Chunk={args.chunk_size}, Batch={args.batch}, Seq={args.seq_len}")
-
-  
-    main(chunk_size=args.chunk_size, batch=args.batch, seq=args.seq_len)
+    main(args.chunk_size, args.batch, args.seq_len, args.hidden_dim, args.num_experts, args.topk)
