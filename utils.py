@@ -21,6 +21,7 @@ def gen_tensor(
     # Add small random perturbation
     router = router + torch.randn_like(router) * 0.001
     # Compute Routing: Logits -> Softmax -> TopK
+    routed_values = F.softmax(torch.einsum('bh, he -> be', tokens, router), dim=-1)
     top_vals, top_idxs = torch.topk(routed_values, topk)
 
     # Bucketize tokens per Expert
