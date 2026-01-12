@@ -8,7 +8,7 @@ import torch.distributed as dist
 from utils import gen_tensor, gen_weights
 from alltoall_persistent_gemm import run as CustomA2A
 from baseline import run as TorchA2A
-
+import argparse
 
 
 def _env_int(*names, default=None):
@@ -186,4 +186,18 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+#    main()
+    # 4 config sweep
+    parser = argparse.ArgumentParser()
+   
+    parser.add_argument('--chunk_size', type=int, default=32, help='Chunk size')
+    parser.add_argument('--batch', type=int, default=4, help='Batch size')
+    parser.add_argument('--seq_len', type=int, default=4096, help='Sequence length')
+    
+    args = parser.parse_args()
+
+
+    print(f">> Running with Chunk={args.chunk_size}, Batch={args.batch}, Seq={args.seq_len}")
+
+  
+    main(chunk_size=args.chunk_size, batch=args.batch, seq=args.seq_len)
