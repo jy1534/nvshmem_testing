@@ -12,11 +12,11 @@ def gen_tensor(
     torch.manual_seed(rank)
     assert num_experts % world_size == 0, "Incorrect EP_SIZE, world_size should evenly divide num_experts."
 
-    # mimic Input Tokens
-    # Shape: [batch * seq, hidden_dim]
+     # mimic Input Tokens
+    # Shape: [batch * seq, hidden_dim
     tokens = torch.rand(batch*seq, hidden_dim, dtype=torch.bfloat16).to("cuda" if torch.cuda.is_available() else "cpu")
-    
-    #stimulate router/gating
+   
+    # stimulate router/gating
     router = torch.zeros(hidden_dim, num_experts, dtype=torch.bfloat16).to("cuda" if torch.cuda.is_available() else "cpu")
     # Add small random perturbation
     router = router + torch.randn_like(router) * 0.001
@@ -24,28 +24,32 @@ def gen_tensor(
     routed_values = F.softmax(torch.einsum('bh, he -> be', tokens, router), dim=-1)
     top_vals, top_idxs = torch.topk(routed_values, topk)
 
-    # Bucketize tokens per Expert
+     # Bucketize tokens per Expert
     expert_tokens = []
-    real_expert_lengths = [] # New: records actual valid length for zero-skipping kernel
+    real_expert_lengths = [] # records actual valid length for zero-skipping kernel
     for ex in range(num_experts):
         mask = (top_idxs == ex).any(dim=-1)
-        tkns = tokens[mask] # (num tokens routed to an expert, hidden dimension)
+        tkns = tokens[mask] # (num tokens routed to an expert, hidden dimension).
         if tkns.numel() > 0:
             real_expert_lengths.append(tkns.shape[0])
             expert_tokens.append(tkns)
         else:
             real_expert_lengths.append(0) # 0 if empty
-            # Handle empty buckets: record 0 length, but append a 1-row dummy 
+           # Handle empty buckets: record 0 length, but append a 1-row dummy 
             # to simplify the padding logic (avoids concatenation errors with empty tensors)
+            
             tmp_tkns = torch.zeros(1, hidden_dim, dtype=torch.bfloat16, device="cuda")
             expert_tokens.append(tmp_tkns)
-
+    
     # Global Padding Logic
     # Calculate global max token count to ensure uniform shapes for NCCL All-to-All
     max_tkn_cnt = max([i.shape[0] for i in expert_tokens]) # max_tkn_cnt in local
 
     # Exhcange between devices
-    global_max = torch.tensor([max_tkn_cnt], dtype=torch.int32).to("cuda" if torch.cuda.is_available() else "cpu")
+    global_max = torch.tensor([max_tkn_cnt], dtype=torch.int32).to("cuda" if torch.cuda.is_available() else "cpu") 
+    
+    dist.all_reduce(global_max, dist.ReduceOp.MAX) # New: then pad token bucket of each expert to global_max
+   
     if rank == 0:
        
         print(f'[rank: {rank}]: global_max_tkn_cnt: {global_max.item()}')
@@ -66,7 +70,7 @@ def gen_tensor(
 
     # coalesce for All-to-All
     # concatenate all padded buckets along dim 0
-    coalesced_experts = torch.cat(padded_experts, dim=0)
+    coalesced_experts = torch.cat(padded_experts, dim=0) 
     
     # Define Chunk Size for EP
     expert_per_device = num_experts // world_size
